@@ -30,11 +30,15 @@ class LinearKalmanFilter_with_SVD:
 
     #Initialize matrices U and D
     def initialize(self):
+        print(self.P_posterior)
+
         #Perform initial SVD
-        self.U, D_squared, _ = np.linalg.svd(self.P_Posterior)
-        self.D = np.sqrt(D_squared)
+        self.U, D_squared, _ = np.linalg.svd(self.P_posterior)
+        self.D = np.diag(np.sqrt(D_squared))
         #Cholesky matrix calculation pre-computed since measurement covariance assumed time-invariant
         self.L = np.linalg.inv((sqrtm(self.R)).T)
+        #Initialize x_prior to x_posterior for the first iteration
+        self.x_prior = self.x_posterior.copy()
 
     #Step 1 in Algorithm 1: Update SVD using pre-array (eq. 32)
     def update_SVD(self):
@@ -46,7 +50,7 @@ class LinearKalmanFilter_with_SVD:
         V = V_transpose.T
         #Update SVD factors U, D
         self.U_posterior = self.U @ V
-        self.D_posterior = np.linalg.inv(D_temp)
+        self.D_posterior = np.linalg.inv(np.diag(D_temp))
 
     #Steps 2 and 3 in Algorithm 1
     def update(self, z):
@@ -70,7 +74,7 @@ class LinearKalmanFilter_with_SVD:
         #Consider computing SVD manually to avoid computing 
         # left orthogonal orthgonal component (high dimension)
         _, D_temp, V_temp = np.linalg.svd(A, full_matrices = False)
-        self.D = D_temp
+        self.D = np.diag(D_temp)
         self.U = V_temp
     
     #In this KF we assume R is time-invariant (does not depend on time-step), so we skip Step 5
