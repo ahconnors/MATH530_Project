@@ -23,9 +23,9 @@ class LinearKalmanFilter_with_SVD:
         self.H = None               #Measurement matrix
         self.R = None               #Measurement noise covariance
         self.Q = None               #Process noise covariance
-        self.D = None               #Singular value matrix of P
+        self.D_prior = None         #Singular value matrix of P
         self.D_posterior = None     #Posterior singular value matrix of P
-        self.U = None               #Left orthogonal factor of SVD of P
+        self.U_prior = None         #Left orthogonal factor of SVD of P
         self.U_posterior = None     #Posterior left orthogonal factor of SVD of P
 
     #Initialize matrices U and D
@@ -33,8 +33,11 @@ class LinearKalmanFilter_with_SVD:
         print(self.P_posterior)
 
         #Perform initial SVD
-        self.U, D_squared, _ = np.linalg.svd(self.P_posterior)
-        self.D = np.diag(np.sqrt(D_squared))
+        self.U_prior, D_squared, _ = np.linalg.svd(self.P_posterior)
+        self.D_prior = np.diag(np.sqrt(D_squared))
+
+        self.U_posterior = self.U_prior.copy()
+        self.D_posterior = self.D_prior.copy()
         #Cholesky matrix calculation pre-computed since measurement covariance assumed time-invariant
         self.L = np.linalg.inv((sqrtm(self.R)).T)
         #Initialize x_prior to x_posterior for the first iteration
@@ -42,14 +45,15 @@ class LinearKalmanFilter_with_SVD:
 
     #Step 1 in Algorithm 1: Update SVD using pre-array (eq. 32)
     def update_SVD(self):
+        self._check_state()
         #Constrcut pre-array: (m+n) x n matrix
-        A = np.concatenate((self.L.T @ self.H @ self.U, np.linalg.inv(self.D)), axis = 0)
+        A = np.concatenate((self.L.T @ self.H @ self.U_prior, np.linalg.inv(self.D_prior)), axis = 0)
         #Obtain pre-array SVD factor V
         #Consider computing this manually and skipping U calculation for efficicency
         _, D_temp, V_transpose = np.linalg.svd(A)    
         V = V_transpose.T
         #Update SVD factors U, D
-        self.U_posterior = self.U @ V
+        self.U_posterior = self.U_prior @ V
         self.D_posterior = np.linalg.inv(np.diag(D_temp))
 
     #Steps 2 and 3 in Algorithm 1
@@ -62,20 +66,29 @@ class LinearKalmanFilter_with_SVD:
         y = z - (self.H @ self.x_prior)
         self.x_posterior = self.x_prior + (K @ y)
 
+    def skip_update(self):
+        """Call this instead of update() when measurement is missing"""
+        self.x_posterior = self.x_prior.copy()
+        self.U_posterior = self.U_prior.copy()   # carry forward SVD factors unchanged
+        self.D_posterior = self.D_prior.copy()
+
     #Step 4 in Algorithm 1
     def predict(self):
+        self._check_state()
         #Predict the next state
         self.x_prior = self.F @ self.x_posterior
 
         #Calculate U, D  SVD factors using eq (21).
         #Construct pre-array: (s+n) x n
-        A = np.concatenate((sqrtm(self.D_posterior) @ self.U_posterior @ self.F.T,
+        # A = np.concatenate((sqrtm(self.D_posterior) @ self.U_posterior @ self.F.T,
+        #                     sqrtm(self.Q).T), axis = 0)
+        A = np.concatenate((self.D_posterior @ self.U_posterior.T @ self.F.T,
                             (sqrtm(self.Q)).T), axis = 0)
         #Consider computing SVD manually to avoid computing 
         # left orthogonal orthgonal component (high dimension)
         _, D_temp, V_temp = np.linalg.svd(A, full_matrices = False)
-        self.D = np.diag(D_temp)
-        self.U = V_temp
+        self.U_prior = V_temp.T
+        self.D_prior = np.diag(D_temp)
     
     #In this KF we assume R is time-invariant (does not depend on time-step), so we skip Step 5
 
@@ -105,4 +118,19 @@ class LinearKalmanFilter_with_SVD:
     def get_prior_covariance(self):
         return self.P_prior
 
-
+    def _check_state(self, label=""):
+        problems = []
+        for name, val in [("U_prior", self.U_prior), 
+                        ("D_prior", self.D_prior),
+                        ("U_posterior", self.U_posterior),
+                        ("D_posterior", self.D_posterior),
+                        ("x_prior", self.x_prior),
+                        ("x_posterior", self.x_posterior)]:
+            if val is None:
+                problems.append(f"{name} is None")
+            elif np.isnan(val).any():
+                problems.append(f"{name} contains NaN")
+            elif np.isinf(val).any():
+                problems.append(f"{name} contains Inf")
+        if problems:
+            raise ValueError(f"[{label}] State corruption: {', '.join(problems)}")

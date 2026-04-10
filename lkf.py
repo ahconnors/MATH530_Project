@@ -33,6 +33,11 @@ class LinearKalmanFilter:
         I = np.eye(len(self.P_posterior))
         self.P_posterior = (I - (K @ self.H)) @ self.P_prior
 
+    def skip_update(self):
+        """Call this instead of update() when measurement is missing"""
+        self.x_posterior = self.x_prior.copy()
+        self.P_posterior = self.P_prior.copy()
+
     def set_matrices(self, F, H, R, Q):
         self.F = F
         self.H = H
