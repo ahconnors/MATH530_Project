@@ -14,24 +14,30 @@ class LinearKalmanFilter:
         self.H = None               # Measurement matrix
         self.R = None               # Measurement noise covariance
         self.Q = None               # Process noise covariance
+        self.residual = None        #Most recent residual/Kalman innovation
 
     def predict(self):
         # Predict the next state
         self.x_prior = np.dot(self.F, self.x_posterior)
         # Predict the next estimate covariance
         self.P_prior = np.dot(self.F, np.dot(self.P_posterior, self.F.T)) + self.Q
+    
 
     def update(self, z):
         # Compute the Kalman Gain
         y = z - np.dot(self.H, self.x_prior)            # Measurement residual
         S = self.H @ self.P_prior @ self.H.T + self.R   # Residual covariance
         K = self.P_prior @ self.H.T @ np.linalg.inv(S)  # Kalman Gain
-
+        
+        self.residual = y
+        
         # Update the state estimate
         self.x_posterior = self.x_prior + (K @ y)
         # Update the estimate covariance
         I = np.eye(len(self.P_posterior))
         self.P_posterior = (I - (K @ self.H)) @ self.P_prior
+
+        
 
     def skip_update(self):
         """Call this instead of update() when measurement is missing"""
@@ -59,3 +65,9 @@ class LinearKalmanFilter:
     
     def get_prior_covariance(self):
         return self.P_prior
+    
+    def get_last_residual(self):
+        return self.residual
+
+
+    

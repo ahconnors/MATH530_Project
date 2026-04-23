@@ -1,16 +1,16 @@
 import numpy as np
-from lkf_with_SVD import LinearKalmanFilter_with_SVD
+from lkf import LinearKalmanFilter
 from collections import deque
 from scipy.linalg import sqrtm
 
 
-class AdaptiveSVDKalmanFilter(LinearKalmanFilter_with_SVD):
-    '''Adaptive Kalman Filter implemented with Singular Value Decomposition (SVD)
+class AdaptiveKalmanFilter(LinearKalmanFilter):
+    '''Adaptive Kalman Filter implemented on standard Linear Kalman Filter
     
-    Implements Algorithm 1 in Ordonez et al. (2020) with adaptive measurement noise
-    estimation described in Equations 29-30.
+    Adapts Algorithm 1 in Ordonez et al. (2020) with adaptive measurement noise
+    estimation described in Equations 29-30. Uses a base LKF with no decomposition.
 
-    Addition to base LinearKalmanFilter_with_SVD is matrix R is not fixed
+    Addition to base LinearKalmanFilter is matrix R is not fixed
     but updates at every step with a rolling window of raw signal samples used
     to re-estimate noise standard deviation.
 
@@ -22,7 +22,7 @@ class AdaptiveSVDKalmanFilter(LinearKalmanFilter_with_SVD):
 
 
     def __init__(self):
-        super().__init__()  #Initialize lkf_with_SVD
+        super().__init__()  #Initialize sqrt_kf
         self.window_size = 30       # default window size, rollowing window length
         self.min_variance = 1e-10   # floor on estimated variance
         self.signal_buffer = None   #list[deque], containes one deque per measurement channel
@@ -43,7 +43,7 @@ class AdaptiveSVDKalmanFilter(LinearKalmanFilter_with_SVD):
             self._init_buffers()
         
     def set_matrices(self, F, H, R, Q):
-        # Delegates to parent LinearKalmanFilter_with_SVD, then initializes
+        # Delegates to parent Sqrt_Kf then initializes
         # one deque per measurement channel
         super().set_matrices(F, H, R, Q)
         self._init_buffers()
@@ -72,7 +72,7 @@ class AdaptiveSVDKalmanFilter(LinearKalmanFilter_with_SVD):
         for ch, buf in enumerate(self.signal_buffer):
             buf.append(measurement[ch])
 
-    # Adaptive R Estimation (Equations 29-30 in Ordonez)
+    # Adaptive R Estimation (Equations 29-30)
 
     def _estimate_R(self):
         #Compute the time-variant measurement noise covariance R_k
@@ -101,7 +101,7 @@ class AdaptiveSVDKalmanFilter(LinearKalmanFilter_with_SVD):
     def update(self, z):
         # Adaptive measurement-update step.
 
-        #Step 5 of Algorithm 1
+        #Step 5 of Algorithm 1 (equivalent but with Sqrt KF)
         # Estimate R_k from current signal window
         R_nominal = self.R  # Save nominal R
         self.R  = self._estimate_R() #Use adaptive R_k
@@ -113,9 +113,7 @@ class AdaptiveSVDKalmanFilter(LinearKalmanFilter_with_SVD):
         #     R_sqrt = np.real_if_close(R_sqrt, tol=1000)
         # self.L = np.linalg.inv(R_sqrt.T)
 
-        # Update SVD factors with new R
-        self.update_SVD()
-
+        
         # Run the SVD update using adapted R_k
         super().update(z)
 

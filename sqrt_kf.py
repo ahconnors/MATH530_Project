@@ -21,7 +21,7 @@ class SqrtKalmanFilter:
         self.M_prior = None
         self.R_cholesky = None      # Square root of measurement noise covariance
         self.Q_cholesky = None      # Square root of process noise covariance
-
+        self.residual = None        # Most recent residual / Kalman innovation
 
     #Predict step
     def predict(self):
@@ -34,6 +34,8 @@ class SqrtKalmanFilter:
     def update(self, z):
         # Compute the innovation and Kalman Gain
         y = z - np.dot(self.H, self.x_prior)            # Measurement residual / innovation
+        self.residual = y
+        
         # Residual/ innovation covariance, using QR decomposition as describe in Algorithm 1 of Tracy (2022)
         G = self.qr(self.M_prior @ self.H.T, self.R_cholesky)
 
@@ -94,5 +96,8 @@ class SqrtKalmanFilter:
     
     def get_prior_covariance(self):
         return self.M_prior.T @ self.M_prior
+    
+    def get_last_residual(self):
+        return self.residual
     
     

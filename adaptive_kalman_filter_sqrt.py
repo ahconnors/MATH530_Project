@@ -5,12 +5,13 @@ from scipy.linalg import sqrtm
 
 
 class AdaptiveSqrtKalmanFilter(SqrtKalmanFilter):
-    '''Adaptive Kalman Filter implemented with Singular Value Decomposition (SVD)
+    '''Adaptive Kalman Filter implemented with QR decomposition.
     
-    Implements Algorithm 1 in Ordonez et al. (2020) with adaptive measurement noise
-    estimation described in Equations 29-30.
+    Adapts Algorithm 1 in Ordonez et al. (2020) with adaptive measurement noise
+    estimation described in Equations 29-30. Uses Base Sqrt KF algorithm from 'A square-root Kalman
+    filter using only QR decompositions' (Tracy, 2022)
 
-    Addition to base LinearKalmanFilter_with_SVD is matrix R is not fixed
+    Addition to base SqrtKalmanFilter is matrix R is not fixed
     but updates at every step with a rolling window of raw signal samples used
     to re-estimate noise standard deviation.
 
@@ -30,7 +31,7 @@ class AdaptiveSqrtKalmanFilter(SqrtKalmanFilter):
 
 
     # Setup for adaptive Kalman Filter
-    def set_adaptive_params(self, window_size = 5, min_variance = 1e-14):
+    def set_adaptive_params(self, window_size = 20, min_variance = 1e-14):
         # window_size - rolling window length (must be >= 3 so that diff has
         #at least 2 elements)
         if window_size < 3:
@@ -107,11 +108,11 @@ class AdaptiveSqrtKalmanFilter(SqrtKalmanFilter):
         self.R  = self._estimate_R() #Use adaptive R_k
         self.R_adaptive  = self.R.copy()    # Save R_adaptive
 
-        # Recompute L from new R
-        R_sqrt = sqrtm(self.R)
-        if np.iscomplexobj(R_sqrt):
-            R_sqrt = np.real_if_close(R_sqrt, tol=1000)
-        self.L = np.linalg.inv(R_sqrt.T)
+        # # Recompute L from new R
+        # R_sqrt = sqrtm(self.R)
+        # if np.iscomplexobj(R_sqrt):
+        #     R_sqrt = np.real_if_close(R_sqrt, tol=1000)
+        # self.L = np.linalg.inv(R_sqrt.T)
 
         
         # Run the SVD update using adapted R_k

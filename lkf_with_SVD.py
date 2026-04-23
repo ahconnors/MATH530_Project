@@ -27,6 +27,7 @@ class LinearKalmanFilter_with_SVD:
         self.D_posterior = None     #Posterior singular value matrix of P
         self.U_prior = None         #Left orthogonal factor of SVD of P
         self.U_posterior = None     #Posterior left orthogonal factor of SVD of P
+        self.residual = None        # Most recetn residual /Kalman innovation
 
     #Initialize matrices U and D
     def initialize(self):
@@ -59,6 +60,7 @@ class LinearKalmanFilter_with_SVD:
 
     #Steps 2 and 3 in Algorithm 1
     def update(self, z):
+        self.update_SVD()
         #Compute Kalman Gain (eq 43) (Step 2)
         B = self.H.T @ self.L
         K = self.U_posterior @ (self.D_posterior)**2 @ self.U_posterior.T @ B @ self.L.T
@@ -66,6 +68,7 @@ class LinearKalmanFilter_with_SVD:
         #Update state estimate (Step 3) (eq 44)
         y = z - (self.H @ self.x_prior)
         self.x_posterior = self.x_prior + (K @ y)
+        self.residual = y
 
     def skip_update(self):
         """Call this instead of update() when measurement is missing"""
@@ -118,6 +121,9 @@ class LinearKalmanFilter_with_SVD:
     
     def get_prior_covariance(self):
         return self.P_prior
+    
+    def get_last_residual(self):
+        return self.residual
 
     def _check_state(self, label=""):
         problems = []
