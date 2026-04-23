@@ -31,7 +31,7 @@ class LinearKalmanFilter_with_SVD:
     #Initialize matrices U and D
     def initialize(self):
         print(self.P_posterior)
-
+        print(self.x_posterior)
         #Perform initial SVD
         self.U_prior, D_squared, _ = np.linalg.svd(self.P_posterior)
         self.D_prior = np.diag(np.sqrt(D_squared))
@@ -39,9 +39,10 @@ class LinearKalmanFilter_with_SVD:
         self.U_posterior = self.U_prior.copy()
         self.D_posterior = self.D_prior.copy()
         #Cholesky matrix calculation pre-computed since measurement covariance assumed time-invariant
-        self.L = np.linalg.inv((sqrtm(self.R)).T)
+        self.L = np.linalg.inv((np.linalg.cholesky(self.R)).T)
         #Initialize x_prior to x_posterior for the first iteration
         self.x_prior = self.x_posterior.copy()
+        print(self.x_posterior)
 
     #Step 1 in Algorithm 1: Update SVD using pre-array (eq. 32)
     def update_SVD(self):
@@ -74,7 +75,7 @@ class LinearKalmanFilter_with_SVD:
 
     #Step 4 in Algorithm 1
     def predict(self):
-        self._check_state()
+        #self._check_state()
         #Predict the next state
         self.x_prior = self.F @ self.x_posterior
 
@@ -83,7 +84,7 @@ class LinearKalmanFilter_with_SVD:
         # A = np.concatenate((sqrtm(self.D_posterior) @ self.U_posterior @ self.F.T,
         #                     sqrtm(self.Q).T), axis = 0)
         A = np.concatenate((self.D_posterior @ self.U_posterior.T @ self.F.T,
-                            (sqrtm(self.Q)).T), axis = 0)
+                            (np.linalg.cholesky(self.Q)).T), axis = 0)
         #Consider computing SVD manually to avoid computing 
         # left orthogonal orthgonal component (high dimension)
         _, D_temp, V_temp = np.linalg.svd(A, full_matrices = False)
