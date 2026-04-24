@@ -4,6 +4,7 @@
     This KF follows "Algorithm 1": Singular value decomposition-based Kalman filtering
     This does not include the 'Adaptive' KF model described in the paper, 
     so we assume measurement covariance matrix R is time invariant. 
+    adaptive_kalman_filter_svd.py implements the adaptive version of this SVD-based KF.
     '''
 
 

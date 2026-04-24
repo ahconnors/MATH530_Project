@@ -1,10 +1,10 @@
 import numpy as np
-from numpy import linalg
+from scipy import linalg
 from scipy.linalg import solve_triangular
 
 class SqrtKalmanFilter:
     """
-    An implementation of a square root Kalman Filter for state estimation in a linear dynamic syste,
+    An implementation of a square root Kalman Filter for state estimation in a linear dynamic system,
     adapted from A square-root Kalman filter using only QR decompositions (Tracy, 2022).
     """
 
@@ -63,7 +63,16 @@ class SqrtKalmanFilter:
     # concatenation of matrices A, B
     def qr(self, A, B):
         concatenated = np.vstack((A,B))
-        r = linalg.qr(concatenated, mode = 'r')
+        r = np.linalg.qr(concatenated, mode='r')
+        
+        # Use mode='reduced' and unpack explicitly — mode='r' returns a namedtuple
+        # in numpy 2.0+ which breaks np.diag and vstack downstream.
+        # _, r = linalg.qr(concatenated, mode='reduced')
+
+        # # Enforce positive diagonals to match Cholesky convention (M.T @ M = P)
+        # signs = np.sign(np.diag(r))
+        # signs[signs == 0] = 1
+        # r = signs[:, np.newaxis] * r
         return r
 
     def skip_update(self):
@@ -76,14 +85,16 @@ class SqrtKalmanFilter:
         self.H = H
         self.R = R
         self.Q = Q
-        self.Q_cholesky = linalg.cholesky(Q)
-        self.R_cholesky = linalg.cholesky(R)
+        # Compute upper triangular Cholesky Matrix (Q = Q_cholesky^T @ Q_cholesky)
+        self.Q_cholesky = linalg.cholesky(Q, lower = False)
+        self.R_cholesky = linalg.cholesky(R, lower = False)
 
 
     def set_initial_state(self, x0, P0):
         self.x_posterior = x0
         self.P_posterior = P0
-        self.M_posterior = linalg.cholesky(P0)
+        # M_posterior is upper triangular matrix: P0 = M.T @ M
+        self.M_posterior = linalg.cholesky(P0, lower = False)
 
     def get_updated_state(self):
         return self.x_posterior
@@ -100,4 +111,17 @@ class SqrtKalmanFilter:
     def get_last_residual(self):
         return self.residual
     
-    
+    def _check_state(self, label=""):
+        problems = []
+        for name, val in [("M_Prior", self.M_prior), 
+                        ("M_Posterior", self.M_posterior),
+                        ("x_prior", self.x_prior),
+                        ("x_posterior", self.x_posterior)]:
+            if val is None:
+                problems.append(f"{name} is None")
+            elif np.isnan(val).any():
+                problems.append(f"{name} contains NaN")
+            elif np.isinf(val).any():
+                problems.append(f"{name} contains Inf")
+        if problems:
+            raise ValueError(f"[{label}] State corruption: {', '.join(problems)}")

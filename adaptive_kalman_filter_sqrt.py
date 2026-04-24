@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.linalg
 from sqrt_kf import SqrtKalmanFilter
 from collections import deque
 from scipy.linalg import sqrtm
@@ -7,9 +8,9 @@ from scipy.linalg import sqrtm
 class AdaptiveSqrtKalmanFilter(SqrtKalmanFilter):
     '''Adaptive Kalman Filter implemented with QR decomposition.
     
-    Adapts Algorithm 1 in Ordonez et al. (2020) with adaptive measurement noise
-    estimation described in Equations 29-30. Uses Base Sqrt KF algorithm from 'A square-root Kalman
-    filter using only QR decompositions' (Tracy, 2022)
+    Uses adaptive measurement noise
+    estimation described in Equations 29-30 of Ordonez et al. (2020). 
+    Uses Base Sqrt KF algorithm from 'A square-root Kalman filter using only QR decompositions' (Tracy, 2022)
 
     Addition to base SqrtKalmanFilter is matrix R is not fixed
     but updates at every step with a rolling window of raw signal samples used
@@ -31,7 +32,7 @@ class AdaptiveSqrtKalmanFilter(SqrtKalmanFilter):
 
 
     # Setup for adaptive Kalman Filter
-    def set_adaptive_params(self, window_size = 20, min_variance = 1e-14):
+    def set_adaptive_params(self, window_size = 120, min_variance = 1e-10):
         # window_size - rolling window length (must be >= 3 so that diff has
         #at least 2 elements)
         if window_size < 3:
@@ -102,24 +103,19 @@ class AdaptiveSqrtKalmanFilter(SqrtKalmanFilter):
     def update(self, z):
         # Adaptive measurement-update step.
 
-        #Step 5 of Algorithm 1 (equivalent but with Sqrt KF)
-        # Estimate R_k from current signal window
-        R_nominal = self.R  # Save nominal R
-        self.R  = self._estimate_R() #Use adaptive R_k
-        self.R_adaptive  = self.R.copy()    # Save R_adaptive
+        R_nominal = self.R
+        R_cholesky_nominal = self.R_cholesky
 
-        # # Recompute L from new R
-        # R_sqrt = sqrtm(self.R)
-        # if np.iscomplexobj(R_sqrt):
-        #     R_sqrt = np.real_if_close(R_sqrt, tol=1000)
-        # self.L = np.linalg.inv(R_sqrt.T)
+        self.R = self._estimate_R()
+        self.R_adaptive = self.R.copy()
+        # Use numpy.linalg.cholesky (lower triangular) to match parent set_matrices convention
+        self.R_cholesky = scipy.linalg.cholesky(self.R, lower = False)
 
-        
-        # Run the SVD update using adapted R_k
         super().update(z)
 
-        # Restore nominal R so repeated set_matrices() calls are consistent
+        # Restore nominal values so repeated set_matrices() calls are consistent
         self.R = R_nominal
+        self.R_cholesky = R_cholesky_nominal
 
 
     # Accessor function

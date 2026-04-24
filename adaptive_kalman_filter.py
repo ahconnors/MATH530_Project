@@ -30,7 +30,7 @@ class AdaptiveKalmanFilter(LinearKalmanFilter):
 
 
     # Setup for adaptive Kalman Filter
-    def set_adaptive_params(self, window_size = 20, min_variance = 1e-14):
+    def set_adaptive_params(self, window_size = 120, min_variance = 1e-10):
         # window_size - rolling window length (must be >= 3 so that diff has
         #at least 2 elements)
         if window_size < 3:
@@ -107,12 +107,7 @@ class AdaptiveKalmanFilter(LinearKalmanFilter):
         self.R  = self._estimate_R() #Use adaptive R_k
         self.R_adaptive  = self.R.copy()    # Save R_adaptive
 
-        # # Recompute L from new R
-        # R_sqrt = sqrtm(self.R)
-        # if np.iscomplexobj(R_sqrt):
-        #     R_sqrt = np.real_if_close(R_sqrt, tol=1000)
-        # self.L = np.linalg.inv(R_sqrt.T)
-
+     
         
         # Run the SVD update using adapted R_k
         super().update(z)
